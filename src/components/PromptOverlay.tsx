@@ -6,7 +6,7 @@ type PromptOverlayProps = {
 }
 
 const PROMPT_INTERVAL_MS = 30_000
-const PROMPT_VISIBLE_MS = 6_000
+const PROMPT_VISIBLE_MS = 10_000
 
 export const PromptOverlay = ({ isNewYearsDay }: PromptOverlayProps) => {
   const prompts = useMemo(() => getPromptsForDate(isNewYearsDay), [isNewYearsDay])
@@ -43,9 +43,17 @@ export const PromptOverlay = ({ isNewYearsDay }: PromptOverlayProps) => {
 
   if (!prompts.length) return null
 
+  const currentText = prompts[promptIndex]
+
   return (
     <div className={`floating-prompt ${promptVisible ? 'show' : 'hide'}`} aria-live="polite">
-      <span>{prompts[promptIndex]}</span>
+      <span
+        key={promptIndex}
+        className="prompt-text"
+        style={{ ['--prompt-chars' as string]: currentText.length }}
+      >
+        {currentText}
+      </span>
     </div>
   )
 }

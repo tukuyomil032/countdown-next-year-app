@@ -13,17 +13,21 @@ export const AudioVisualizer = ({ source }: AudioVisualizerProps) => {
   useEffect(() => {
     if (!containerRef.current) return undefined
     const instance = new AudioMotionAnalyzer(containerRef.current, {
-      gradient: 'rainbow',
+      gradient: 'prism',
       showScaleX: false,
       showScaleY: false,
       overlay: true,
-      lineWidth: 2,
-      fillAlpha: 0.15,
-      ledBars: false,
-      reflexRatio: 0.14,
-      smoothing: 0.8,
-      alphaBars: true,
+      lineWidth: 3,
+      fillAlpha: 0.4,
+      ledBars: true,
+      reflexRatio: 0.28,
+      reflexAlpha: 0.35,
+      smoothing: 0.65,
+      alphaBars: false,
       ansiBands: false,
+      barSpace: 0.25,
+      loRes: false,
+      showBgColor: false,
       mode: 0,
     })
     analyzerRef.current = instance
