@@ -258,7 +258,8 @@
   left: 50%;
   transform: translate(-50%, 120%) scale(0.97);
   padding: 18px 22px;
-  max-width: min(880px, 92vw);
+  width: clamp(320px, 70vw, 760px);
+  max-width: clamp(320px, 70vw, 760px);
   border-radius: 22px;
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(148, 163, 184, 0.08));
   backdrop-filter: blur(18px) saturate(120%);
@@ -316,11 +317,13 @@
   display: inline-block;
   font-family: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   white-space: nowrap;
+  overflow-wrap: anywhere;
   overflow: hidden;
   border-right: 2px solid rgba(255, 255, 255, 0.65);
   text-align: center;
   max-width: 100%;
-  width: calc(var(--prompt-chars) * 1ch);
+  width: 100%;
+  line-height: 1.2;
   animation: caret 900ms steps(1) infinite;
 }
 
@@ -363,6 +366,24 @@
   50.01%,
   100% {
     border-color: transparent;
+  }
+}
+
+@media (max-width: 640px) {
+  .floating-prompt {
+    top: 68%;
+    width: 90vw;
+    max-width: 90vw;
+    padding: 12px 14px;
+    border-radius: 16px;
+    font-size: clamp(14px, 4.2vw, 18px);
+    letter-spacing: 0.01em;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22), 0 0 30px rgba(103, 232, 249, 0.1), 0 0 26px rgba(192, 132, 252, 0.1);
+  }
+
+  .prompt-text {
+    border-right-width: 1px;
+    line-height: 1.25;
   }
 }
 

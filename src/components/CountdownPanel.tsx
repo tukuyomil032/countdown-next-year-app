@@ -24,12 +24,12 @@ export const CountdownPanel = ({
       {premiereActive && <div className="premiere-overlay" />}
 
       <div className="relative flex flex-col gap-3">
-        <div className="relative flex items-center justify-center gap-2 md:gap-3 min-h-[38px]">
-          <div className="absolute left-0 flex items-center gap-3 text-sm uppercase tracking-[0.2em] text-slate-300">
+        <div className="relative flex flex-col items-center gap-2 text-center md:flex-row md:items-center md:justify-center md:gap-3 md:w-full min-h-[44px]">
+          <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-slate-300 md:absolute md:left-0 md:text-sm md:text-left">
             <div className={`h-2 w-2 rounded-full ${premiereActive ? 'bg-amber-300 animate-ping' : 'bg-glow-cyan'}`} />
             {premiereActive ? 'Premiere mode · 残り5分演出' : 'Live countdown'}
           </div>
-          <div className="rounded-full border border-white/15 bg-slate-900/70 px-3 py-1.5 text-sm font-semibold text-white shadow-lg md:px-4">
+          <div className="rounded-full border border-white/15 bg-slate-900/70 px-3 py-1 text-sm font-semibold text-white shadow-lg md:px-4 md:py-1.5">
             現在: {nowLabel}
           </div>
         </div>

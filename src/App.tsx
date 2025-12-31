@@ -18,6 +18,7 @@ function App() {
 
   const [soundEnabled, setSoundEnabled] = useState(false)
   const [bgmError, setBgmError] = useState<string | null>(null)
+  const [mobileControlsOpen, setMobileControlsOpen] = useState(false)
 
   const audioCtxRef = useRef<AudioContext | null>(null)
   const lastBeepSecondRef = useRef<number | null>(null)
@@ -52,6 +53,8 @@ function App() {
   const handleToggleBgm = () => {
     setBgmEnabled(!bgmEnabled)
   }
+
+  const closeMobileControls = () => setMobileControlsOpen(false)
 
   const triggerBeep = (intensity: 'normal' | 'final' = 'normal') => {
     if (!soundEnabled) {
@@ -152,7 +155,7 @@ function App() {
       className={`relative min-h-screen overflow-hidden text-slate-100 ${premiereActive ? 'premiere-bg' : ''}`}
       onClick={fireClickEffect}
     >
-      <div className="pointer-events-none absolute right-4 top-4 z-20 md:right-8 md:top-8">
+      <div className="pointer-events-none absolute right-4 top-4 z-20 hidden md:block md:right-8 md:top-8">
         <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-white/10 bg-slate-900/60 px-3 py-2 shadow-lg backdrop-blur">
           <button
             type="button"
@@ -166,6 +169,54 @@ function App() {
           <button
             type="button"
             className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 ${
+              bgmEnabled ? 'bg-cyan-400 text-slate-900 hover:bg-cyan-300' : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+            onClick={handleToggleBgm}
+          >
+            BGM {bgmEnabled ? 'ON' : 'OFF'}
+          </button>
+        </div>
+      </div>
+
+      <div className="absolute left-4 top-4 z-30 md:hidden">
+        <button
+          type="button"
+          className="flex items-center gap-2 rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur"
+          onClick={() => setMobileControlsOpen((prev) => !prev)}
+        >
+          <span className="sr-only">メニューを開く</span>
+          <img src="/menu-icon.svg" alt="" className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div
+        className={`fixed left-3 top-16 z-30 w-64 max-w-[82vw] rounded-2xl border border-white/10 bg-slate-900/90 p-4 text-white shadow-2xl backdrop-blur transition-transform duration-300 md:hidden ${
+          mobileControlsOpen ? 'translate-x-0' : '-translate-x-[120%]'
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <span className="text-xs uppercase tracking-[0.2em] text-slate-300">Controls</span>
+          <button
+            type="button"
+            className="rounded-lg bg-white/10 px-2 py-1 text-xs font-semibold hover:bg-white/20"
+            onClick={closeMobileControls}
+          >
+            ×
+          </button>
+        </div>
+        <div className="mt-4 flex flex-col gap-3">
+          <button
+            type="button"
+            className={`w-full rounded-lg px-4 py-3 text-sm font-semibold transition-colors duration-200 ${
+              soundEnabled ? 'bg-amber-400 text-slate-900 hover:bg-amber-300' : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+            onClick={handleToggleSound}
+          >
+            サウンド {soundEnabled ? 'ON' : 'OFF'}
+          </button>
+          <button
+            type="button"
+            className={`w-full rounded-lg px-4 py-3 text-sm font-semibold transition-colors duration-200 ${
               bgmEnabled ? 'bg-cyan-400 text-slate-900 hover:bg-cyan-300' : 'bg-white/10 text-white hover:bg-white/20'
             }`}
             onClick={handleToggleBgm}
