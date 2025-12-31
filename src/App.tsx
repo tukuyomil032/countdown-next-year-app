@@ -1,11 +1,29 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import confetti from 'canvas-confetti'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { useCountdown } from './hooks/useCountdown'
 import { formatTwo, getNextYearTarget } from './utils/time'
 
-const AUDIO_LOOP_URL = '/audio/premiere-loop.mp3'
-const HERO_VIDEO_URL = '/visuals/hero.webm'
-const HERO_VIDEO_FALLBACK = '/visuals/hero.mp4'
+const ICE_BGM = '/audio/Ice Cream.mp3'
+const NEWYEAR_BGM = '/audio/Hedgehog.mp3'
+const HEDGEHOG_PLAY_DURATION_MS = 15 * 60 * 1000
+
+const PROMPT_MESSAGES = [
+  '今年1年はどうでしたか？',
+  '来年の抱負はなんですか？',
+  'どんな瞬間が心に残りましたか？',
+  '新年にまずやりたいことは？',
+  '誰に感謝を伝えたいですか？',
+]
+const PROMPT_INTERVAL_MS = 30_000
+const PROMPT_VISIBLE_MS = 6_000
+
+const AUDIO_CANDIDATES = [ICE_BGM]
+type VideoSource = { src: string; type: string }
+const HERO_VIDEO_SOURCES_DEFAULT: VideoSource[] = [
+  { src: '/visuals/Octagon Abstract Lights.mp4', type: 'video/mp4' },
+]
+const HERO_VIDEO_SOURCES_NEWYEAR: VideoSource[] = [{ src: '/visuals/happy-year-eve.mp4', type: 'video/mp4' }]
 const HERO_POSTER_URL = '/visuals/hero-poster.jpg'
 
 function App() {
@@ -22,12 +40,25 @@ function App() {
   const [bgmError, setBgmError] = useState<string | null>(null)
   const [manualPremiere, setManualPremiere] = useState(false)
   const [manualFinale, setManualFinale] = useState(false)
+  const [hedgehogActive, setHedgehogActive] = useState(false)
+  const [promptIndex, setPromptIndex] = useState(0)
+  const [promptVisible, setPromptVisible] = useState(false)
 
   const premiereTimerRef = useRef<number | null>(null)
   const finaleTimerRef = useRef<number | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
   const lastBeepSecondRef = useRef<number | null>(null)
   const bgmRef = useRef<HTMLAudioElement | null>(null)
+  const hedgehogRef = useRef<HTMLAudioElement | null>(null)
+  const hedgehogStopTimerRef = useRef<number | null>(null)
+  const fadeOutStartedRef = useRef(false)
+  const hedgehogStartedRef = useRef(false)
+  const confettiTriggeredRef = useRef(false)
+  const confettiTimersRef = useRef<number[]>([])
+  const yearPreviewTimerRef = useRef<number | null>(null)
+  const iceStartedRef = useRef(false)
+  const promptIntervalRef = useRef<number | null>(null)
+  const promptHideTimerRef = useRef<number | null>(null)
 
   const premiereActive = (isPremiereWindow && timeLeft.totalMs > 0) || manualPremiere
   const finaleActive = timeLeft.totalMs <= 0 || manualFinale
@@ -81,40 +112,216 @@ function App() {
   }, [manualFinale, soundEnabled])
 
   useEffect(() => {
-    if (!bgmEnabled) {
-      if (bgmRef.current) {
-        bgmRef.current.pause()
-        bgmRef.current.currentTime = 0
-      }
-      return
+    const showPrompt = () => {
+      setPromptVisible(true)
+      if (promptHideTimerRef.current) window.clearTimeout(promptHideTimerRef.current)
+      promptHideTimerRef.current = window.setTimeout(() => setPromptVisible(false), PROMPT_VISIBLE_MS)
     }
 
-    const audio = bgmRef.current ?? new Audio(AUDIO_LOOP_URL)
+    showPrompt()
+
+    promptIntervalRef.current = window.setInterval(() => {
+      setPromptIndex((prev) => (prev + 1) % PROMPT_MESSAGES.length)
+      showPrompt()
+    }, PROMPT_INTERVAL_MS)
+
+    return () => {
+      if (promptIntervalRef.current) window.clearInterval(promptIntervalRef.current)
+      if (promptHideTimerRef.current) window.clearTimeout(promptHideTimerRef.current)
+    }
+  }, [])
+
+  const fadeAudio = useCallback(
+    (audio: HTMLAudioElement, targetVolume: number, durationMs: number, onComplete?: () => void) => {
+      const start = audio.volume
+      const target = Math.max(0, Math.min(1, targetVolume))
+      if (durationMs <= 0) {
+        audio.volume = target
+        onComplete?.()
+        return
+      }
+      const startTime = performance.now()
+      const step = (nowTime: number) => {
+        const progress = Math.min(1, (nowTime - startTime) / durationMs)
+        audio.volume = start + (target - start) * progress
+        if (progress < 1) requestAnimationFrame(step)
+        else onComplete?.()
+      }
+      requestAnimationFrame(step)
+    },
+    [],
+  )
+
+  const fireConfetti = useCallback(() => {
+    confetti({ particleCount: 180, spread: 80, startVelocity: 50, decay: 0.9, scalar: 1 })
+  }, [])
+
+  const clearConfettiTimers = useCallback(() => {
+    confettiTimersRef.current.forEach((id) => window.clearTimeout(id))
+    confettiTimersRef.current = []
+  }, [])
+
+  const startIce = useCallback(() => {
+    if (!bgmEnabled) return
+    const candidate = AUDIO_CANDIDATES[0]
+    const audio = bgmRef.current ?? new Audio(candidate)
+    audio.src = candidate
     audio.loop = true
-    audio.volume = 0.25
+    audio.volume = 0
     bgmRef.current = audio
 
     audio
       .play()
-      .then(() => setBgmError(null))
+      .then(() => {
+        setBgmError(null)
+        fadeAudio(audio, 0.25, 2_000)
+        iceStartedRef.current = true
+      })
       .catch((err) => {
+        console.error('BGM play failed for', candidate, err)
         setBgmError('BGMを再生できませんでした。ファイルの配置またはブラウザ権限を確認してください。')
-        console.error(err)
         setBgmEnabled(false)
       })
+  }, [bgmEnabled, fadeAudio])
+
+  const startHedgehogNow = useCallback(
+    (
+      options?: {
+        durationMs?: number
+        withConfetti?: boolean
+        forceConfetti?: boolean
+        fadeInMs?: number
+        fadeOutMs?: number
+        resumeIce?: boolean
+      },
+    ) => {
+      const durationMs = options?.durationMs ?? HEDGEHOG_PLAY_DURATION_MS
+      const withConfetti = options?.withConfetti ?? true
+      const forceConfetti = options?.forceConfetti ?? false
+      const fadeInMs = options?.fadeInMs ?? 7_000
+      const fadeOutMs = options?.fadeOutMs ?? 10_000
+      const resumeIce = options?.resumeIce ?? true
+
+      if (hedgehogStartedRef.current && !forceConfetti) return
+      hedgehogStartedRef.current = true
+
+      if (hedgehogStopTimerRef.current) window.clearTimeout(hedgehogStopTimerRef.current)
+      if (forceConfetti && hedgehogRef.current) {
+        hedgehogRef.current.pause()
+        hedgehogRef.current.currentTime = 0
+      }
+
+      if (bgmRef.current) {
+        bgmRef.current.pause()
+        iceStartedRef.current = false
+      }
+
+      const audio = hedgehogRef.current ?? new Audio(NEWYEAR_BGM)
+      audio.loop = true
+      audio.volume = 0
+      hedgehogRef.current = audio
+      audio
+        .play()
+        .then(() => {
+          setBgmError(null)
+          setHedgehogActive(true)
+          fadeAudio(audio, 0.7, fadeInMs)
+          if (hedgehogStopTimerRef.current) window.clearTimeout(hedgehogStopTimerRef.current)
+          hedgehogStopTimerRef.current = window.setTimeout(() => {
+            fadeAudio(audio, 0, fadeOutMs, () => {
+              audio.pause()
+              setHedgehogActive(false)
+              hedgehogStartedRef.current = false
+              fadeOutStartedRef.current = false
+              if (resumeIce) {
+                iceStartedRef.current = false
+                startIce()
+              }
+            })
+          }, durationMs)
+        })
+        .catch((err) => {
+          console.error('Hedgehog BGM failed', err)
+          setBgmError('年明けBGMを再生できませんでした。ファイル配置または権限を確認してください。')
+          setHedgehogActive(false)
+          hedgehogStartedRef.current = false
+        })
+
+      if (withConfetti) {
+        if (forceConfetti) {
+          clearConfettiTimers()
+          confettiTriggeredRef.current = false
+        }
+        if (!confettiTriggeredRef.current) {
+          confettiTriggeredRef.current = true
+          fireConfetti()
+          const second = window.setTimeout(fireConfetti, 3000)
+          confettiTimersRef.current.push(second)
+        }
+      }
+    },
+    [clearConfettiTimers, fadeAudio, fireConfetti, startIce],
+  )
+
+  useEffect(() => {
+    if (!bgmEnabled) {
+      fadeOutStartedRef.current = false
+      hedgehogStartedRef.current = false
+      confettiTriggeredRef.current = false
+      iceStartedRef.current = false
+      if (bgmRef.current) {
+        bgmRef.current.pause()
+        bgmRef.current.currentTime = 0
+      }
+      if (hedgehogRef.current) {
+        hedgehogRef.current.pause()
+        hedgehogRef.current.currentTime = 0
+      }
+      if (hedgehogStopTimerRef.current) window.clearTimeout(hedgehogStopTimerRef.current)
+      clearConfettiTimers()
+      if (yearPreviewTimerRef.current) window.clearTimeout(yearPreviewTimerRef.current)
+      setHedgehogActive(false)
+      return
+    }
+
+    if (!iceStartedRef.current) startIce()
 
     return () => {
-      audio.pause()
+      if (bgmRef.current) bgmRef.current.pause()
     }
-  }, [bgmEnabled])
+  }, [bgmEnabled, clearConfettiTimers, startIce])
+
+  useEffect(() => {
+    if (!bgmEnabled) return
+
+    const secondsRemaining = Math.max(0, Math.ceil(timeLeft.totalMs / 1000))
+
+    if (secondsRemaining <= 10 && timeLeft.totalMs > 0 && !fadeOutStartedRef.current) {
+      fadeOutStartedRef.current = true
+      if (bgmRef.current) {
+        fadeAudio(bgmRef.current, 0, 10_000, () => {
+          bgmRef.current?.pause()
+          iceStartedRef.current = false
+        })
+      }
+    }
+
+    if (timeLeft.totalMs <= 0) {
+      startHedgehogNow()
+    }
+  }, [bgmEnabled, fadeAudio, startHedgehogNow, timeLeft.totalMs])
 
   useEffect(() => {
     return () => {
       if (premiereTimerRef.current) window.clearTimeout(premiereTimerRef.current)
       if (finaleTimerRef.current) window.clearTimeout(finaleTimerRef.current)
       if (bgmRef.current) bgmRef.current.pause()
+      if (hedgehogRef.current) hedgehogRef.current.pause()
+      if (hedgehogStopTimerRef.current) window.clearTimeout(hedgehogStopTimerRef.current)
+      clearConfettiTimers()
+      if (yearPreviewTimerRef.current) window.clearTimeout(yearPreviewTimerRef.current)
     }
-  }, [])
+  }, [clearConfettiTimers])
 
   const countdownBlocks = [
     { label: '日', value: timeLeft.days.toString() },
@@ -138,19 +345,86 @@ function App() {
     finaleTimerRef.current = window.setTimeout(() => setManualFinale(false), 6000)
   }
 
+  const triggerYearTransitionPreview = () => {
+    // Ensure BGM ON to hear preview
+    if (!bgmEnabled) setBgmEnabled(true)
+
+    iceStartedRef.current = false
+
+    // Stop existing timers
+    if (yearPreviewTimerRef.current) window.clearTimeout(yearPreviewTimerRef.current)
+    clearConfettiTimers()
+    confettiTriggeredRef.current = false
+
+    // Use real timing profile: 10s fade-out of Ice, 7s fade-in of Hedgehog, 15分再生、10sフェードアウトでIceへ
+    const fadeAndStart = () => {
+      if (bgmRef.current) {
+        fadeAudio(bgmRef.current, 0, 10_000, () => {
+          bgmRef.current?.pause()
+          startHedgehogNow({
+            durationMs: HEDGEHOG_PLAY_DURATION_MS,
+            withConfetti: true,
+            forceConfetti: true,
+            fadeInMs: 7_000,
+            fadeOutMs: 10_000,
+            resumeIce: true,
+          })
+        })
+      } else {
+        startHedgehogNow({
+          durationMs: HEDGEHOG_PLAY_DURATION_MS,
+          withConfetti: true,
+          forceConfetti: true,
+          fadeInMs: 7_000,
+          fadeOutMs: 10_000,
+          resumeIce: true,
+        })
+      }
+    }
+
+    fadeAndStart()
+
+    // Safety reset in case preview is interrupted
+    yearPreviewTimerRef.current = window.setTimeout(() => {
+      if (hedgehogRef.current) {
+        hedgehogRef.current.pause()
+        hedgehogRef.current.currentTime = 0
+      }
+      if (hedgehogStopTimerRef.current) window.clearTimeout(hedgehogStopTimerRef.current)
+      hedgehogStartedRef.current = false
+      setHedgehogActive(false)
+      iceStartedRef.current = false
+      startIce()
+    }, HEDGEHOG_PLAY_DURATION_MS + 20_000)
+  }
+
   return (
     <div className={`relative min-h-screen overflow-hidden text-slate-100 ${premiereActive ? 'premiere-bg' : ''}`}>
       <div className="bg-video" aria-hidden>
         <video
-          className="bg-video-media"
+          className={`bg-video-media ${hedgehogActive ? 'is-hidden' : 'is-active'}`}
           autoPlay
           loop
           muted
           playsInline
           poster={HERO_POSTER_URL}
         >
-          <source src={HERO_VIDEO_URL} type="video/webm" />
-          <source src={HERO_VIDEO_FALLBACK} type="video/mp4" />
+          {HERO_VIDEO_SOURCES_DEFAULT.map((item) => (
+            <source key={item.src} src={item.src} type={item.type} />
+          ))}
+        </video>
+        <video
+          key={hedgehogActive ? 'hedgehog-live' : 'hedgehog-idle'}
+          className={`bg-video-media ${hedgehogActive ? 'is-active' : 'is-hidden'}`}
+          autoPlay
+          loop
+          muted
+          playsInline
+          poster={HERO_POSTER_URL}
+        >
+          {HERO_VIDEO_SOURCES_NEWYEAR.map((item) => (
+            <source key={item.src} src={item.src} type={item.type} />
+          ))}
         </video>
       </div>
       <div className="orb cyan" />
@@ -174,7 +448,9 @@ function App() {
               premiereActive ? 'final-minute-glow text-glow-amber' : ''
             }`}
           >
-            {targetDate.getFullYear()}年まであと
+            <span className={premiereActive ? 'heading-highlight' : ''}>
+              {targetDate.getFullYear()}年まであと
+            </span>
           </h1>
           <p className="text-sm text-slate-400">
             現在: {now.toLocaleString('ja-JP', { timeZoneName: 'short' })}
@@ -247,9 +523,6 @@ function App() {
               {premiereActive && <div className="absolute inset-0 shimmer opacity-40" aria-hidden />}
               <div className="relative flex flex-wrap items-center justify-between gap-3 text-xs uppercase tracking-[0.2em] text-slate-200 md:text-sm">
                 <span className="font-mono text-glow-cyan">{formatTwo(timeLeft.seconds)}s</span>
-                <span className="font-display text-glow-amber">
-                  {premiereActive ? 'プレミア演出：残り5分' : '静かな待機モード'}
-                </span>
                 <span className="font-mono text-purple-200">
                   進捗 {Math.round(displayProgress * 1000) / 10}% / {targetDate.getFullYear()}年
                 </span>
@@ -327,6 +600,13 @@ function App() {
               >
                 フィナーレ(0秒)再生
               </button>
+              <button
+                type="button"
+                className="rounded-xl border border-cyan-200/50 bg-cyan-200/10 px-4 py-3 text-sm font-semibold text-white transition hover:border-cyan-200 hover:bg-cyan-200/20"
+                onClick={triggerYearTransitionPreview}
+              >
+                年越しシミュレーション(約22秒)
+              </button>
             </div>
             <p className="mt-3 text-xs text-slate-300">
               どちらも数秒で自動解除されます。プレショーBGMと組み合わせて演出確認が可能です。
@@ -372,6 +652,10 @@ function App() {
           </div>
         </section>
       </main>
+
+      <div className={`floating-prompt ${promptVisible ? 'show' : 'hide'}`} aria-live="polite">
+        <span>{PROMPT_MESSAGES[promptIndex]}</span>
+      </div>
     </div>
   )
 }
