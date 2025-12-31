@@ -20,11 +20,15 @@ export const PromptOverlay = ({ isNewYearsDay }: PromptOverlayProps) => {
   }, [prompts])
 
   useEffect(() => {
-    if (!prompts.length) return undefined
+    if (!prompts.length) {
+      return undefined
+    }
 
     const showPrompt = () => {
       setPromptVisible(true)
-      if (promptHideTimerRef.current) window.clearTimeout(promptHideTimerRef.current)
+      if (promptHideTimerRef.current) {
+        window.clearTimeout(promptHideTimerRef.current)
+      }
       promptHideTimerRef.current = window.setTimeout(() => setPromptVisible(false), PROMPT_VISIBLE_MS)
     }
 
@@ -36,12 +40,18 @@ export const PromptOverlay = ({ isNewYearsDay }: PromptOverlayProps) => {
     }, PROMPT_INTERVAL_MS)
 
     return () => {
-      if (promptIntervalRef.current) window.clearInterval(promptIntervalRef.current)
-      if (promptHideTimerRef.current) window.clearTimeout(promptHideTimerRef.current)
+      if (promptIntervalRef.current) {
+        window.clearInterval(promptIntervalRef.current)
+      }
+      if (promptHideTimerRef.current) {
+        window.clearTimeout(promptHideTimerRef.current)
+      }
     }
   }, [prompts])
 
-  if (!prompts.length) return null
+  if (!prompts.length) {
+    return null
+  }
 
   const currentText = prompts[promptIndex]
 

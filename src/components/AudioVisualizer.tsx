@@ -11,7 +11,9 @@ export const AudioVisualizer = ({ source }: AudioVisualizerProps) => {
   const inputRef = useRef<AudioNode | null>(null)
 
   useEffect(() => {
-    if (!containerRef.current) return undefined
+    if (!containerRef.current) {
+      return undefined
+    }
     const instance = new AudioMotionAnalyzer(containerRef.current, {
       gradient: 'prism',
       showScaleX: false,
@@ -41,7 +43,9 @@ export const AudioVisualizer = ({ source }: AudioVisualizerProps) => {
 
   useEffect(() => {
     const analyzer = analyzerRef.current
-    if (!analyzer || !source) return
+    if (!analyzer || !source) {
+      return
+    }
 
     try {
       const node = analyzer.audioCtx.createMediaElementSource(source)

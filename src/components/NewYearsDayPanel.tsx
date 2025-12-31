@@ -7,7 +7,9 @@ type NewYearsDayPanelProps = {
 }
 
 export const NewYearsDayPanel = ({ visible, blocks, targetYear }: NewYearsDayPanelProps) => {
-  if (!visible || !blocks.length) return null
+  if (!visible || !blocks.length) {
+    return null
+  }
 
   return (
     <section className="relative w-full overflow-hidden rounded-3xl border border-cyan-200/30 bg-cyan-200/10 p-6 shadow-lg backdrop-blur-xl md:p-8">

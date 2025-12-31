@@ -46,7 +46,9 @@ export const useBgmController = ({
 
   const hedgehogVisualActive = hedgehogActive || isNewYearsDay
   const visualizerSource = useMemo(() => {
-    if (hedgehogRef.current && !hedgehogRef.current.paused) return hedgehogRef.current
+    if (hedgehogRef.current && !hedgehogRef.current.paused) {
+      return hedgehogRef.current
+    }
     return bgmRef.current ?? null
   }, [hedgehogActive])
 
@@ -70,8 +72,11 @@ export const useBgmController = ({
       const step = (nowTime: number) => {
         const progress = Math.min(1, (nowTime - startTime) / durationMs)
         audio.volume = start + (target - start) * progress
-        if (progress < 1) requestAnimationFrame(step)
-        else onComplete?.()
+        if (progress < 1) {
+          requestAnimationFrame(step)
+        } else {
+          onComplete?.()
+        }
       }
       requestAnimationFrame(step)
     },
@@ -88,7 +93,9 @@ export const useBgmController = ({
   }, [])
 
   const startIce = useCallback(() => {
-    if (!bgmEnabled) return
+    if (!bgmEnabled) {
+      return
+    }
     if (bgmRef.current) {
       bgmRef.current.pause()
       bgmRef.current.currentTime = 0
@@ -112,7 +119,7 @@ export const useBgmController = ({
       })
       .catch((err) => {
         console.error('BGM play failed for Ice Cream', err)
-        setError('BGMを再生できませんでした。ファイルの配置またはブラウザ権限を確認してください。')
+        setError('BGMを再生できませんでした。ブラウザーの権限を確認してください。')
         setBgmEnabled(false)
       })
   }, [bgmEnabled, fadeAudio, setError])
@@ -135,10 +142,14 @@ export const useBgmController = ({
       const fadeOutMs = options?.fadeOutMs ?? DEFAULT_FADE_OUT_MS
       const resumeIce = options?.resumeIce ?? true
 
-      if (hedgehogStartedRef.current && !forceConfetti) return
+      if (hedgehogStartedRef.current && !forceConfetti) {
+        return
+      }
       hedgehogStartedRef.current = true
 
-      if (hedgehogStopTimerRef.current) window.clearTimeout(hedgehogStopTimerRef.current)
+      if (hedgehogStopTimerRef.current) {
+        window.clearTimeout(hedgehogStopTimerRef.current)
+      }
       if (forceConfetti && hedgehogRef.current) {
         hedgehogRef.current.pause()
         hedgehogRef.current.currentTime = 0
@@ -159,7 +170,9 @@ export const useBgmController = ({
           setError(null)
           setHedgehogActive(true)
           fadeAudio(audio, 0.7, fadeInMs)
-          if (hedgehogStopTimerRef.current) window.clearTimeout(hedgehogStopTimerRef.current)
+          if (hedgehogStopTimerRef.current) {
+            window.clearTimeout(hedgehogStopTimerRef.current)
+          }
           hedgehogStopTimerRef.current = window.setTimeout(() => {
             fadeAudio(audio, 0, fadeOutMs, () => {
               audio.pause()
@@ -210,7 +223,9 @@ export const useBgmController = ({
         hedgehogRef.current.pause()
         hedgehogRef.current.currentTime = 0
       }
-      if (hedgehogStopTimerRef.current) window.clearTimeout(hedgehogStopTimerRef.current)
+      if (hedgehogStopTimerRef.current) {
+        window.clearTimeout(hedgehogStopTimerRef.current)
+      }
       clearConfettiTimers()
       setHedgehogActive(false)
       bgmRef.current = null
@@ -233,7 +248,9 @@ export const useBgmController = ({
     }
 
     return () => {
-      if (bgmRef.current) bgmRef.current.pause()
+      if (bgmRef.current) {
+        bgmRef.current.pause()
+      }
     }
   }, [
     bgmEnabled,
@@ -246,7 +263,9 @@ export const useBgmController = ({
   ])
 
   useEffect(() => {
-    if (!bgmEnabled || isNewYearsDay) return
+    if (!bgmEnabled || isNewYearsDay) {
+      return
+    }
 
     const secondsRemaining = Math.max(0, Math.ceil(timeLeftMs / 1000))
 
@@ -267,9 +286,15 @@ export const useBgmController = ({
 
   useEffect(() => {
     return () => {
-      if (bgmRef.current) bgmRef.current.pause()
-      if (hedgehogRef.current) hedgehogRef.current.pause()
-      if (hedgehogStopTimerRef.current) window.clearTimeout(hedgehogStopTimerRef.current)
+      if (bgmRef.current) {
+        bgmRef.current.pause()
+      }
+      if (hedgehogRef.current) {
+        hedgehogRef.current.pause()
+      }
+      if (hedgehogStopTimerRef.current) {
+        window.clearTimeout(hedgehogStopTimerRef.current)
+      }
       clearConfettiTimers()
     }
   }, [clearConfettiTimers])

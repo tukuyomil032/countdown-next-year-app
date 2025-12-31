@@ -37,7 +37,9 @@ function App() {
   const handleToggleSound = () => {
     setSoundEnabled((prev) => {
       const next = !prev
-      if (!next) lastBeepSecondRef.current = null
+      if (!next) {
+        lastBeepSecondRef.current = null
+      }
       return next
     })
     if (audioCtxRef.current?.state === 'suspended') {
@@ -52,7 +54,9 @@ function App() {
   }
 
   const triggerBeep = (intensity: 'normal' | 'final' = 'normal') => {
-    if (!soundEnabled) return
+    if (!soundEnabled) {
+      return
+    }
     audioCtxRef.current = audioCtxRef.current ?? new AudioContext()
     const ctx = audioCtxRef.current
     const osc = ctx.createOscillator()
@@ -75,7 +79,9 @@ function App() {
   }
 
   useEffect(() => {
-    if (!soundEnabled) return
+    if (!soundEnabled) {
+      return
+    }
     const secondsRemaining = Math.max(0, Math.ceil(timeLeft.totalMs / 1000))
 
     if (timeLeft.totalMs <= 0 && lastBeepSecondRef.current !== -1) {
@@ -94,14 +100,18 @@ function App() {
   }, [isFinalTen, soundEnabled, timeLeft.totalMs])
 
   useEffect(() => {
-    if (!soundEnabled || !yearJustRolled) return
+    if (!soundEnabled || !yearJustRolled) {
+      return
+    }
     triggerBeep('final')
     triggerBeep('final')
   }, [soundEnabled, yearJustRolled])
 
   const fireClickEffect = useCallback((evt: { clientX: number; clientY: number }) => {
     const nowTs = performance.now()
-    if (nowTs - lastClickEffectRef.current < 250) return
+    if (nowTs - lastClickEffectRef.current < 250) {
+      return
+    }
     lastClickEffectRef.current = nowTs
     const x = Math.min(0.98, Math.max(0.02, evt.clientX / window.innerWidth))
     const y = Math.min(0.98, Math.max(0.02, evt.clientY / window.innerHeight))

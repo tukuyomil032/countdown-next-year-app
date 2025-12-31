@@ -33,8 +33,12 @@ export const formatTwo = (value: number) => value.toString().padStart(2, '0')
 export const getYearProgress = (now: Date, startOfYear: Date, target: Date) => {
   const total = target.getTime() - startOfYear.getTime()
   const elapsed = now.getTime() - startOfYear.getTime()
-  if (now.getTime() >= target.getTime()) return 1
-  if (elapsed <= 0 || total <= 0) return 0
+  if (now.getTime() >= target.getTime()) {
+    return 1
+  }
+  if (elapsed <= 0 || total <= 0) {
+    return 0
+  }
   const ratio = elapsed / total
   // Keep below 100% until完全到達
   return Math.min(0.9999, Math.max(0, ratio))
