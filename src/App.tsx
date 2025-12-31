@@ -1,22 +1,14 @@
 import confetti from 'canvas-confetti'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
+import { AudioVisualizer } from './components/AudioVisualizer'
+import { PromptOverlay } from './components/PromptOverlay'
 import { useCountdown } from './hooks/useCountdown'
-import { formatTwo, getNextYearTarget } from './utils/time'
+import { formatTwo } from './utils/time'
 
 const ICE_BGM = '/audio/Ice Cream.mp3'
 const NEWYEAR_BGM = '/audio/Hedgehog.mp3'
 const HEDGEHOG_PLAY_DURATION_MS = 15 * 60 * 1000
-
-const PROMPT_MESSAGES = [
-  '今年1年はどうでしたか？',
-  '来年の抱負はなんですか？',
-  'どんな瞬間が心に残りましたか？',
-  '新年にまずやりたいことは？',
-  '誰に感謝を伝えたいですか？',
-]
-const PROMPT_INTERVAL_MS = 30_000
-const PROMPT_VISIBLE_MS = 6_000
 
 const AUDIO_CANDIDATES = [ICE_BGM]
 type VideoSource = { src: string; type: string }
@@ -27,25 +19,14 @@ const HERO_VIDEO_SOURCES_NEWYEAR: VideoSource[] = [{ src: '/visuals/happy-year-e
 const HERO_POSTER_URL = '/visuals/hero-poster.jpg'
 
 function App() {
-  const [targetDate] = useState<Date>(() => getNextYearTarget())
-  const startOfYear = useMemo(
-    () => new Date(targetDate.getFullYear() - 1, 0, 1, 0, 0, 0, 0),
-    [targetDate],
-  )
-
-  const { now, timeLeft, progress, isPremiereWindow, isFinalTen } = useCountdown(targetDate)
+  const { now, targetDate, startOfYear, timeLeft, progress, isPremiereWindow, isFinalTen, isNewYearsDay, newYearsDayLeft, yearJustRolled } =
+    useCountdown()
 
   const [soundEnabled, setSoundEnabled] = useState(false)
   const [bgmEnabled, setBgmEnabled] = useState(false)
   const [bgmError, setBgmError] = useState<string | null>(null)
-  const [manualPremiere, setManualPremiere] = useState(false)
-  const [manualFinale, setManualFinale] = useState(false)
   const [hedgehogActive, setHedgehogActive] = useState(false)
-  const [promptIndex, setPromptIndex] = useState(0)
-  const [promptVisible, setPromptVisible] = useState(false)
 
-  const premiereTimerRef = useRef<number | null>(null)
-  const finaleTimerRef = useRef<number | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
   const lastBeepSecondRef = useRef<number | null>(null)
   const bgmRef = useRef<HTMLAudioElement | null>(null)
@@ -55,13 +36,11 @@ function App() {
   const hedgehogStartedRef = useRef(false)
   const confettiTriggeredRef = useRef(false)
   const confettiTimersRef = useRef<number[]>([])
-  const yearPreviewTimerRef = useRef<number | null>(null)
   const iceStartedRef = useRef(false)
-  const promptIntervalRef = useRef<number | null>(null)
-  const promptHideTimerRef = useRef<number | null>(null)
-
-  const premiereActive = (isPremiereWindow && timeLeft.totalMs > 0) || manualPremiere
-  const finaleActive = timeLeft.totalMs <= 0 || manualFinale
+  const hedgehogVisualActive = hedgehogActive || isNewYearsDay
+  const lastClickEffectRef = useRef(0)
+  const premiereActive = isPremiereWindow && timeLeft.totalMs > 0
+  const finaleActive = yearJustRolled
 
   const triggerBeep = (intensity: 'normal' | 'final' = 'normal') => {
     if (!soundEnabled) return
@@ -106,30 +85,10 @@ function App() {
   }, [isFinalTen, soundEnabled, timeLeft.totalMs])
 
   useEffect(() => {
-    if (!soundEnabled || !manualFinale) return
+    if (!soundEnabled || !yearJustRolled) return
     triggerBeep('final')
     triggerBeep('final')
-  }, [manualFinale, soundEnabled])
-
-  useEffect(() => {
-    const showPrompt = () => {
-      setPromptVisible(true)
-      if (promptHideTimerRef.current) window.clearTimeout(promptHideTimerRef.current)
-      promptHideTimerRef.current = window.setTimeout(() => setPromptVisible(false), PROMPT_VISIBLE_MS)
-    }
-
-    showPrompt()
-
-    promptIntervalRef.current = window.setInterval(() => {
-      setPromptIndex((prev) => (prev + 1) % PROMPT_MESSAGES.length)
-      showPrompt()
-    }, PROMPT_INTERVAL_MS)
-
-    return () => {
-      if (promptIntervalRef.current) window.clearInterval(promptIntervalRef.current)
-      if (promptHideTimerRef.current) window.clearTimeout(promptHideTimerRef.current)
-    }
-  }, [])
+  }, [soundEnabled, yearJustRolled])
 
   const fadeAudio = useCallback(
     (audio: HTMLAudioElement, targetVolume: number, durationMs: number, onComplete?: () => void) => {
@@ -154,6 +113,28 @@ function App() {
 
   const fireConfetti = useCallback(() => {
     confetti({ particleCount: 180, spread: 80, startVelocity: 50, decay: 0.9, scalar: 1 })
+  }, [])
+
+  // Visualization is handled by audiomotion-analyzer (see AudioVisualizer)
+
+  const fireClickEffect = useCallback((evt: { clientX: number; clientY: number }) => {
+    const nowTs = performance.now()
+    if (nowTs - lastClickEffectRef.current < 250) return
+    lastClickEffectRef.current = nowTs
+    const x = Math.min(0.98, Math.max(0.02, evt.clientX / window.innerWidth))
+    const y = Math.min(0.98, Math.max(0.02, evt.clientY / window.innerHeight))
+    confetti({
+      particleCount: 48,
+      spread: 90,
+      startVelocity: 42,
+      scalar: 1.05,
+      origin: { x, y },
+      decay: 0.92,
+      gravity: 0.3,
+      ticks: 120,
+      shapes: ['circle'],
+      colors: ['#7dd3fc', '#c4b5fd', '#fde68a', '#e0f2fe'],
+    })
   }, [])
 
   const clearConfettiTimers = useCallback(() => {
@@ -279,20 +260,39 @@ function App() {
       }
       if (hedgehogStopTimerRef.current) window.clearTimeout(hedgehogStopTimerRef.current)
       clearConfettiTimers()
-      if (yearPreviewTimerRef.current) window.clearTimeout(yearPreviewTimerRef.current)
       setHedgehogActive(false)
       return
     }
 
-    if (!iceStartedRef.current) startIce()
+    if (isNewYearsDay) {
+      const durationMs = newYearsDayLeft?.totalMs ?? HEDGEHOG_PLAY_DURATION_MS
+      startHedgehogNow({
+        durationMs,
+        withConfetti: yearJustRolled,
+        forceConfetti: yearJustRolled,
+        fadeInMs: 5_000,
+        fadeOutMs: 10_000,
+        resumeIce: true,
+      })
+    } else if (!iceStartedRef.current) {
+      startIce()
+    }
 
     return () => {
       if (bgmRef.current) bgmRef.current.pause()
     }
-  }, [bgmEnabled, clearConfettiTimers, startIce])
+  }, [
+    bgmEnabled,
+    clearConfettiTimers,
+    isNewYearsDay,
+    newYearsDayLeft?.totalMs,
+    startHedgehogNow,
+    startIce,
+    yearJustRolled,
+  ])
 
   useEffect(() => {
-    if (!bgmEnabled) return
+    if (!bgmEnabled || isNewYearsDay) return
 
     const secondsRemaining = Math.max(0, Math.ceil(timeLeft.totalMs / 1000))
 
@@ -305,21 +305,14 @@ function App() {
         })
       }
     }
-
-    if (timeLeft.totalMs <= 0) {
-      startHedgehogNow()
-    }
-  }, [bgmEnabled, fadeAudio, startHedgehogNow, timeLeft.totalMs])
+  }, [bgmEnabled, fadeAudio, isNewYearsDay, timeLeft.totalMs])
 
   useEffect(() => {
     return () => {
-      if (premiereTimerRef.current) window.clearTimeout(premiereTimerRef.current)
-      if (finaleTimerRef.current) window.clearTimeout(finaleTimerRef.current)
       if (bgmRef.current) bgmRef.current.pause()
       if (hedgehogRef.current) hedgehogRef.current.pause()
       if (hedgehogStopTimerRef.current) window.clearTimeout(hedgehogStopTimerRef.current)
       clearConfettiTimers()
-      if (yearPreviewTimerRef.current) window.clearTimeout(yearPreviewTimerRef.current)
     }
   }, [clearConfettiTimers])
 
@@ -330,79 +323,27 @@ function App() {
     { label: '秒', value: formatTwo(timeLeft.seconds) },
   ]
 
+  const newYearsDayBlocks = newYearsDayLeft
+    ? [
+        { label: '時間', value: formatTwo(newYearsDayLeft.hours + newYearsDayLeft.days * 24) },
+        { label: '分', value: formatTwo(newYearsDayLeft.minutes) },
+        { label: '秒', value: formatTwo(newYearsDayLeft.seconds) },
+      ]
+    : []
+
   const displayProgress = timeLeft.totalMs <= 0 ? 1 : Math.min(progress, 0.999)
   const progressPercent = (displayProgress * 100).toFixed(1)
-
-  const triggerPremierePreview = () => {
-    setManualPremiere(true)
-    if (premiereTimerRef.current) window.clearTimeout(premiereTimerRef.current)
-    premiereTimerRef.current = window.setTimeout(() => setManualPremiere(false), 15000)
-  }
-
-  const triggerFinalePreview = () => {
-    setManualFinale(true)
-    if (finaleTimerRef.current) window.clearTimeout(finaleTimerRef.current)
-    finaleTimerRef.current = window.setTimeout(() => setManualFinale(false), 6000)
-  }
-
-  const triggerYearTransitionPreview = () => {
-    // Ensure BGM ON to hear preview
-    if (!bgmEnabled) setBgmEnabled(true)
-
-    iceStartedRef.current = false
-
-    // Stop existing timers
-    if (yearPreviewTimerRef.current) window.clearTimeout(yearPreviewTimerRef.current)
-    clearConfettiTimers()
-    confettiTriggeredRef.current = false
-
-    // Use real timing profile: 10s fade-out of Ice, 7s fade-in of Hedgehog, 15分再生、10sフェードアウトでIceへ
-    const fadeAndStart = () => {
-      if (bgmRef.current) {
-        fadeAudio(bgmRef.current, 0, 10_000, () => {
-          bgmRef.current?.pause()
-          startHedgehogNow({
-            durationMs: HEDGEHOG_PLAY_DURATION_MS,
-            withConfetti: true,
-            forceConfetti: true,
-            fadeInMs: 7_000,
-            fadeOutMs: 10_000,
-            resumeIce: true,
-          })
-        })
-      } else {
-        startHedgehogNow({
-          durationMs: HEDGEHOG_PLAY_DURATION_MS,
-          withConfetti: true,
-          forceConfetti: true,
-          fadeInMs: 7_000,
-          fadeOutMs: 10_000,
-          resumeIce: true,
-        })
-      }
-    }
-
-    fadeAndStart()
-
-    // Safety reset in case preview is interrupted
-    yearPreviewTimerRef.current = window.setTimeout(() => {
-      if (hedgehogRef.current) {
-        hedgehogRef.current.pause()
-        hedgehogRef.current.currentTime = 0
-      }
-      if (hedgehogStopTimerRef.current) window.clearTimeout(hedgehogStopTimerRef.current)
-      hedgehogStartedRef.current = false
-      setHedgehogActive(false)
-      iceStartedRef.current = false
-      startIce()
-    }, HEDGEHOG_PLAY_DURATION_MS + 20_000)
-  }
+  const visualizerSource =
+    hedgehogRef.current && !hedgehogRef.current.paused ? hedgehogRef.current : bgmRef.current
 
   return (
-    <div className={`relative min-h-screen overflow-hidden text-slate-100 ${premiereActive ? 'premiere-bg' : ''}`}>
+    <div
+      className={`relative min-h-screen overflow-hidden text-slate-100 ${premiereActive ? 'premiere-bg' : ''}`}
+      onClick={fireClickEffect}
+    >
       <div className="bg-video" aria-hidden>
         <video
-          className={`bg-video-media ${hedgehogActive ? 'is-hidden' : 'is-active'}`}
+          className={`bg-video-media ${hedgehogVisualActive ? 'is-hidden' : 'is-active'}`}
           autoPlay
           loop
           muted
@@ -414,8 +355,8 @@ function App() {
           ))}
         </video>
         <video
-          key={hedgehogActive ? 'hedgehog-live' : 'hedgehog-idle'}
-          className={`bg-video-media ${hedgehogActive ? 'is-active' : 'is-hidden'}`}
+          key={hedgehogVisualActive ? 'hedgehog-live' : 'hedgehog-idle'}
+          className={`bg-video-media ${hedgehogVisualActive ? 'is-active' : 'is-hidden'}`}
           autoPlay
           loop
           muted
@@ -434,6 +375,7 @@ function App() {
       <div className="scanlines" />
       <div className="grid-overlay" />
       <div className="noise-overlay" />
+      <AudioVisualizer source={visualizerSource} />
       {premiereActive && <div className="premiere-rings" />}
       {premiereActive && <div className="energy-lines" />}
       {finaleActive && <div className="finale-flare" />}
@@ -444,7 +386,7 @@ function App() {
             Next Year Launch
           </span>
           <h1
-            className={`font-display text-4xl font-semibold leading-tight md:text-5xl ${
+            className={`hero-heading font-display text-4xl font-semibold leading-tight md:text-5xl ${
               premiereActive ? 'final-minute-glow text-glow-amber' : ''
             }`}
           >
@@ -555,107 +497,35 @@ function App() {
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg">
-            <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Premiere</div>
-            <h3 className="mt-2 text-lg font-semibold text-white">5分前に演出開始</h3>
-            <p className="mt-1 text-sm text-slate-300">
-              5分前から背景リングとラインが点灯し、ラスト10秒はビープ。BGMをONにするとプレショー風の雰囲気を追加できます。
-            </p>
-          </div>
-          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg">
-            <div className="text-xs uppercase tracking-[0.2em] text-slate-400">デバッグ</div>
-            <h3 className="mt-2 text-lg font-semibold text-white">演出テスト</h3>
-            <p className="mt-1 text-sm text-slate-300">
-              「5分前演出再生」「フィナーレ再生」ボタンで演出を即座に確認できます。音も同様にプレビュー。
-            </p>
-          </div>
-          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg">
-            <div className="text-xs uppercase tracking-[0.2em] text-slate-400">アセット</div>
-            <h3 className="mt-2 text-lg font-semibold text-white">メディア配置</h3>
-            <p className="mt-1 text-sm text-slate-300">
-              /public/audio にBGM、/public/visuals に画像や動画を置くと自動配信されます。差し替えや差分テストが容易です。
-            </p>
-          </div>
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-2">
-          <div className="glass-card relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg">
-            <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-slate-400">
-              <span>演出デバッグ</span>
-              <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] text-amber-100">Preview only</span>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-3">
-              <button
-                type="button"
-                className="rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:border-amber-200 hover:bg-amber-200/10"
-                onClick={triggerPremierePreview}
-              >
-                5分前演出を再生
-              </button>
-              <button
-                type="button"
-                className="rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:border-amber-200 hover:bg-amber-200/10"
-                onClick={triggerFinalePreview}
-              >
-                フィナーレ(0秒)再生
-              </button>
-              <button
-                type="button"
-                className="rounded-xl border border-cyan-200/50 bg-cyan-200/10 px-4 py-3 text-sm font-semibold text-white transition hover:border-cyan-200 hover:bg-cyan-200/20"
-                onClick={triggerYearTransitionPreview}
-              >
-                年越しシミュレーション(約22秒)
-              </button>
-            </div>
-            <p className="mt-3 text-xs text-slate-300">
-              どちらも数秒で自動解除されます。プレショーBGMと組み合わせて演出確認が可能です。
-            </p>
-          </div>
-
-          <div className="glass-card relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg">
-            <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-slate-400">
-              <span>ステータス</span>
-              <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] text-cyan-100">Live</span>
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-              <div className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 p-3">
-                <span className="text-xs uppercase tracking-[0.2em] text-slate-400">モード</span>
-                <span className="font-display text-white">{premiereActive ? 'Premiere' : 'Standby'}</span>
+        {isNewYearsDay && newYearsDayLeft && (
+          <section className="relative overflow-hidden rounded-3xl border border-cyan-200/30 bg-cyan-200/10 p-6 shadow-lg backdrop-blur-xl md:p-8">
+            <div className="absolute inset-0 bg-gradient-to-r from-glow-cyan/10 via-glow-purple/10 to-glow-amber/10 opacity-60" aria-hidden />
+            <div className="relative flex flex-col gap-4">
+              <div className="flex items-center justify-between text-xs uppercase tracking-[0.25em] text-cyan-100">
+                <span>元日終了まで</span>
+                <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] text-white">Today only</span>
               </div>
-              <div className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 p-3">
-                <span className="text-xs uppercase tracking-[0.2em] text-slate-400">BGM</span>
-                <span className={`font-display ${bgmEnabled ? 'text-glow-cyan' : 'text-slate-300'}`}>
-                  {bgmEnabled ? 'ON' : 'OFF'}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 p-3">
-                <span className="text-xs uppercase tracking-[0.2em] text-slate-400">サウンド</span>
-                <span className={`font-display ${soundEnabled ? 'text-glow-amber' : 'text-slate-300'}`}>
-                  {soundEnabled ? 'ON' : 'OFF'}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 p-3">
-                <span className="text-xs uppercase tracking-[0.2em] text-slate-400">残り</span>
-                <span className="font-mono text-white">
-                  {timeLeft.days}日 {formatTwo(timeLeft.hours)}:{formatTwo(timeLeft.minutes)}:{formatTwo(timeLeft.seconds)}
-                </span>
-              </div>
-            </div>
-            <div className="mt-4 h-10 w-full overflow-hidden rounded-xl bg-white/5">
-              <div className="equalizer">
-                {[...Array(18)].map((_, idx) => (
-                  <span key={idx} className="eq-bar" style={{ ['--i' as string]: idx }} />
+              <div className="grid grid-cols-3 gap-3 rounded-2xl border border-white/15 bg-slate-900/60 p-4 md:gap-4 md:p-6">
+                {newYearsDayBlocks.map((block) => (
+                  <div
+                    key={block.label}
+                    className="relative overflow-hidden rounded-2xl bg-white/5 px-4 py-4 text-center shadow-lg ring-1 ring-white/10"
+                  >
+                    <div className="text-[11px] uppercase tracking-[0.3em] text-slate-300">{block.label}</div>
+                    <div className="mt-2 font-mono text-4xl font-semibold text-white md:text-5xl">{block.value}</div>
+                  </div>
                 ))}
               </div>
+              <p className="text-sm text-slate-200">
+                {targetDate.getFullYear() - 1}年の元日が終わるまでのカウントダウンです。BGMと背景は終日ニューイヤーモードでお楽しみください。
+              </p>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
+
       </main>
 
-      <div className={`floating-prompt ${promptVisible ? 'show' : 'hide'}`} aria-live="polite">
-        <span>{PROMPT_MESSAGES[promptIndex]}</span>
-      </div>
+      <PromptOverlay isNewYearsDay={isNewYearsDay} />
     </div>
   )
 }

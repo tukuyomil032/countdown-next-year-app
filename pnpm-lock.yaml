@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      audiomotion-analyzer:
+        specifier: ^4.5.2
+        version: 4.5.2
       canvas-confetti:
         specifier: ^1.9.4
         version: 1.9.4
@@ -627,6 +630,9 @@ packages:
 
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
+
+  audiomotion-analyzer@4.5.2:
+    resolution: {integrity: sha512-u72xK+fVS8cjlJpd87w3ZePbtBW9zj/9yMIN95a+ew0eI/aO8UT9oWxSJtp9e5XRDCAdwDzbummc4FDyC2zWPg==}
 
   autoprefixer@10.4.23:
     resolution: {integrity: sha512-YYTXSFulfwytnjAPlw8QHncHJmlvFKtczb8InXaAx9Q0LbfDnfEYDE55omerIJKihhmU61Ft+cAOSzQVaBUmeA==}
@@ -1853,6 +1859,8 @@ snapshots:
   arg@5.0.2: {}
 
   argparse@2.0.1: {}
+
+  audiomotion-analyzer@4.5.2: {}
 
   autoprefixer@10.4.23(postcss@8.5.6):
     dependencies:

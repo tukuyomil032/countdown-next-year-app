@@ -8,8 +8,10 @@ export type TimeLeft = {
 
 export const getNextYearTarget = () => {
   const now = new Date()
-  return new Date(now.getFullYear() + 1, 0, 1, 0, 0, 0, 0)
+  return getNextYearTargetFrom(now)
 }
+
+export const getNextYearTargetFrom = (base: Date) => new Date(base.getFullYear() + 1, 0, 1, 0, 0, 0, 0)
 
 export const calculateTimeLeft = (target: Date, now: Date = new Date()): TimeLeft => {
   const diff = target.getTime() - now.getTime()
