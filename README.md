@@ -23,24 +23,25 @@ Displays the remaining time until the next year from the current time and plays 
 - [pnpm](https://pnpm.io/installation)
 
 ### Installation
+  1. Clone the repository
+  ```sh
+  git clone https://github.com/tukuyomil032/countdown-next-year-app.git
 
-    1. Clone the repository
+  cd countdown-next-year-app
+  ```
 
-    ```sh
-    git clone https://github.com/tukuyomil032/countdown-next-year-app.git
 
-    cd countdown-next-year-app
-    ```
+  2. Install dependencies
+  ```sh
+  pnpm install
+  ```
 
-    2. Install dependencies
-    ```sh
-    pnpm install
-    ```
 
-    3. Run
-    ```sh
-    pnpm dev
-    ```
+  3. Run
+  ```sh
+  pnpm dev
+  ```
+    
 
 
 ## License
